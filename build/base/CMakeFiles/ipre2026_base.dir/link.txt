@@ -1,0 +1,2 @@
+/usr/bin/ar qc libipre2026_base.a CMakeFiles/ipre2026_base.dir/planta_comun.cc.o CMakeFiles/ipre2026_base.dir/controlador.cc.o
+/usr/bin/ranlib libipre2026_base.a
