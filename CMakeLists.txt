@@ -9,4 +9,5 @@ find_package(drake CONFIG REQUIRED
 )
 
 add_subdirectory(base)
+add_subdirectory(lcm)
 # add_subdirectory(test)  # descomenta cuando lo necesites

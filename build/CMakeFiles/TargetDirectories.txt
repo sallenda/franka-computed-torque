@@ -1,6 +1,0 @@
-/home/sallende/Documentos/ipre2026/build/CMakeFiles/edit_cache.dir
-/home/sallende/Documentos/ipre2026/build/CMakeFiles/rebuild_cache.dir
-/home/sallende/Documentos/ipre2026/build/base/CMakeFiles/ipre2026_base.dir
-/home/sallende/Documentos/ipre2026/build/base/CMakeFiles/mi_sim.dir
-/home/sallende/Documentos/ipre2026/build/base/CMakeFiles/edit_cache.dir
-/home/sallende/Documentos/ipre2026/build/base/CMakeFiles/rebuild_cache.dir

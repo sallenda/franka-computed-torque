@@ -10,6 +10,8 @@
 #include "drake/multibody/tree/spatial_inertia.h"
 #include "drake/systems/framework/diagram_builder.h"
 
+
+
 namespace ipre2026 {
 
 using drake::geometry::Box;
@@ -22,7 +24,8 @@ using drake::systems::DiagramBuilder;
 
 PlantaComun::PlantaComun() {
     DiagramBuilder<double> builder;
-    
+
+    // Agrega la planta y el scene graph
     auto [plant_ref, scene_graph_ref] = drake::multibody::AddMultibodyPlantSceneGraph(&builder, 0.001);
     plant_ = &plant_ref;
     scene_graph_ = &scene_graph_ref;
@@ -52,8 +55,7 @@ PlantaComun::PlantaComun() {
 
 
     plant_->Finalize();
-
-    
+ 
 
     // Exportar puertos
     actuation_input_port_index_ = builder.ExportInput(plant_->get_actuation_input_port(panda), "actuation_input");
