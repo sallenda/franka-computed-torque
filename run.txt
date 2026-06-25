@@ -1,0 +1,16 @@
+// Build//
+
+cmake --build build -j4
+
+Terminal 1
+// run simulacion //
+
+./build/lcm/mi_sim_lcm
+
+
+
+Terminal 2
+// run controlador //
+
+./build/lcm/mi_controlador
+
