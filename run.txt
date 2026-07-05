@@ -1,16 +1,21 @@
-// Build//
+// Build //
 
 cmake --build build -j4
 
-Terminal 1
-// run simulacion //
 
+// Correr en 3 terminales, en este orden //
+
+Terminal 1 - Simulacion (planta + Meshcat)
 ./build/lcm/mi_sim_lcm
+// Abre la URL que imprime en el browser para ver el robot //
 
-
-
-Terminal 2
-// run controlador //
-
+Terminal 2 - Controlador (calcula torques via InverseDynamicsController)
 ./build/lcm/mi_controlador
+// Mientras no corra mi_trayectoria, el robot se queda en la pose home //
+
+Terminal 3 - Trayectoria (publica el estado deseado por LCM)
+./build/lcm/mi_trayectoria
+// El robot empieza a moverse al recibir los comandos de esta terminal //
+// Joint 0 oscila +-0.4 rad con periodo de 10 segundos //
+// Para ajustar: editar kFreqHz y kAmpRad en lcm/trayectoria.cc //
 

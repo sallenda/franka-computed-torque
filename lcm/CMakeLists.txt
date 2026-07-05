@@ -29,3 +29,10 @@ target_link_libraries(mi_controlador
     PRIVATE ipre2026_lcm
     PRIVATE drake::drake
 )
+
+# Ejecutable del publicador de trayectoria
+add_executable(mi_trayectoria trayectoria.cc)
+
+target_link_libraries(mi_trayectoria
+    PRIVATE drake::drake
+)
