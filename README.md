@@ -1,4 +1,4 @@
-# ipre2026
+# Simulación con brazo robotico Franka
 
 Simulación de un brazo robótico Franka Panda con [Drake](https://drake.mit.edu), controlado por dinámica inversa. El sistema se divide en tres procesos independientes (trayectoria, controlador y simulación física) que se comunican exclusivamente a través de canales LCM.
 
