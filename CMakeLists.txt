@@ -8,6 +8,5 @@ find_package(drake CONFIG REQUIRED
     PATHS $ENV{HOME}/drake-install/lib/cmake/drake
 )
 
-add_subdirectory(base)
-add_subdirectory(lcm)
+add_subdirectory(src)
 # add_subdirectory(test)  # descomenta cuando lo necesites

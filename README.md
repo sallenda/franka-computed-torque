@@ -137,18 +137,18 @@ Correr en 3 terminales, en este orden:
 
 ```bash
 # Terminal 1 - Simulación (planta + Meshcat)
-./build/lcm/mi_sim_lcm
+./build/src/mi_sim_lcm
 # Abre la URL que imprime en el navegador para ver el robot
 
 # Terminal 2 - Controlador (dinámica inversa)
-./build/lcm/mi_controlador
+./build/src/mi_controlador
 # Mientras no corra mi_trayectoria, el robot se queda en la pose home
 
 # Terminal 3 - Trayectoria (publica el estado deseado por LCM)
-./build/lcm/mi_trayectoria
+./build/src/mi_trayectoria
 # El robot empieza a moverse al recibir los comandos de esta terminal
 # Joint 0 oscila +-0.4 rad con periodo de 10 segundos
-# Para ajustar: editar kFreqHz y kAmpRad en lcm/trayectoria.cc
+# Para ajustar: editar kFreqHz y kAmpRad en src/trayectoria.cc
 ```
 
 Más detalles de la arquitectura de los tres procesos y los canales LCM en [Documentacion.pdf](Documentacion.pdf).

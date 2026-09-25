@@ -1,21 +1,30 @@
-// Build //
+// Build (primera vez, o si borras la carpeta build) //
+
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j4
+
+// Recompilar despues de cambios //
 
 cmake --build build -j4
+
+
+// Variable de entorno (en cada terminal, si no esta en tu ~/.bashrc) //
+
+export DRAKE_RESOURCE_ROOT=$HOME/drake-install/share
 
 
 // Correr en 3 terminales, en este orden //
 
 Terminal 1 - Simulacion (planta + Meshcat)
-./build/lcm/mi_sim_lcm
-// Abre la URL que imprime en el browser para ver el robot //
+./build/src/mi_sim_lcm
+// Abre la URL que imprime en el browser para ver el robot (http://localhost:7000) //
 
 Terminal 2 - Controlador (calcula torques via InverseDynamicsController)
-./build/lcm/mi_controlador
+./build/src/mi_controlador
 // Mientras no corra mi_trayectoria, el robot se queda en la pose home //
 
 Terminal 3 - Trayectoria (publica el estado deseado por LCM)
-./build/lcm/mi_trayectoria
+./build/src/mi_trayectoria
 // El robot empieza a moverse al recibir los comandos de esta terminal //
 // Joint 0 oscila +-0.4 rad con periodo de 10 segundos //
-// Para ajustar: editar kFreqHz y kAmpRad en lcm/trayectoria.cc //
-
+// Para ajustar: editar kFreqHz y kAmpRad en src/trayectoria.cc //

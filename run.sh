@@ -13,7 +13,7 @@ make -j$(nproc)
 
 # Si compiló bien, correr
 if [ $? -eq 0 ]; then
-    ./base/mi_sim
+    ./src/mi_sim_lcm
 else
     echo "Error en compilación"
 fi
