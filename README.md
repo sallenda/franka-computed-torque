@@ -125,32 +125,78 @@ from pydrake.systems.analysis import Simulator
 print("pydrake OK")
 ```
 
+## Estructura del código
+
+```
+src/
+├── comun/        Código compartido por ambas versiones
+│   ├── modelo_panda.*   Carga del Panda con fricción viscosa B (el URDF no la trae)
+│   ├── referencia.h     Referencias analíticas q_d, dq_d, ddq_d
+│   └── controlador.*    Controlador ETSO del paper (modos VSC, FL, FF)
+├── sin_lcm/      Réplica del paper en un solo proceso (planta + controlador + logging)
+│   ├── experimento.cc       Simulación determinista, escribe log.csv y parametros.csv
+│   └── estimar_friccion.cc  Estimación de B por mínimos cuadrados desde un log
+└── con_lcm/      Arquitectura de 3 procesos comunicados por LCM (camino al Franka real)
+scripts/graficar.py   Figuras estilo Figs. 5-8 del paper
+```
+
+El controlador se define una sola vez en `src/comun`, así que cualquier cambio de diseño se refleja en ambas versiones.
+
 ## Ejecución
 
 Compilar el proyecto:
 
 ```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j4
+export DRAKE_RESOURCE_ROOT=$HOME/drake-install/share
 ```
+
+### Sin LCM (réplica del paper)
+
+```bash
+# Modo FL, robot partiendo 0.3 rad desplazado de la referencia (fase de alcance)
+./build/src/sin_lcm/experimento --modo=fl --offset=0.3 --t_final=10 --salida=resultados/fl
+./build/src/sin_lcm/experimento --modo=vsc --offset=0.3 --t_final=10 --salida=resultados/vsc
+./build/src/sin_lcm/experimento --modo=ff --offset=0.3 --t_final=10 --salida=resultados/ff
+
+# Figuras comparando las tres estructuras (una por joint)
+python3 scripts/graficar.py resultados/vsc resultados/fl resultados/ff --salida figuras
+```
+
+Opciones de `experimento`: `--modo=vsc|fl|ff`, `--referencia=seno|excitacion`, `--t_final`, `--dt` (paso de la planta, 1e-4 por defecto; 0 = continua), `--delta` (precisión Δ en % de A), `--offset` (desplazamiento inicial en rad), `--B_planta` (fricción de la planta, por defecto la misma que asume el controlador), `--dt_log`, `--salida`, `--visualizar` (Meshcat en tiempo real).
+
+Al terminar imprime, por joint, el tiempo de alcance, el error máximo en la fase de seguimiento comparado con e_max = Δ·A y el porcentaje de tiempo con torque saturado.
+
+**Estimación de la fricción viscosa B:**
+
+```bash
+./build/src/sin_lcm/experimento --modo=fl --referencia=excitacion --B_planta=6 --t_final=30 --salida=resultados/excitacion
+./build/src/sin_lcm/estimar_friccion resultados/excitacion/log.csv            # solo viscosa
+./build/src/sin_lcm/estimar_friccion resultados/excitacion/log.csv --coulomb  # viscosa + Coulomb
+```
+
+Sirve con cualquier CSV que tenga las columnas `t, q1..q9, dq1..dq9, tau1..tau9`, por ejemplo un log del robot real.
+
+### Con LCM
 
 Correr en 3 terminales, en este orden:
 
 ```bash
 # Terminal 1 - Simulación (planta + Meshcat)
-./build/src/mi_sim_lcm
+./build/src/con_lcm/mi_sim_lcm
 # Abre la URL que imprime en el navegador para ver el robot
 
-# Terminal 2 - Controlador (dinámica inversa)
-./build/src/mi_controlador
+# Terminal 2 - Controlador (ETSO, modo FL por defecto)
+./build/src/con_lcm/mi_controlador
 # Mientras no corra mi_trayectoria, el robot se queda en la pose home
 
 # Terminal 3 - Trayectoria (publica el estado deseado por LCM)
-./build/src/mi_trayectoria
-# El robot empieza a moverse al recibir los comandos de esta terminal
-# Joint 0 oscila +-0.4 rad con periodo de 10 segundos
-# Para ajustar: editar kFreqHz y kAmpRad en src/trayectoria.cc
+./build/src/con_lcm/mi_trayectoria
+# Joint 1 oscila +-0.4 rad con periodo de 10 segundos
+# Para ajustar: editar kFrecuenciaRefHz y kAmplitudRef en src/comun/referencia.h
 ```
 
+Nota: con el lazo LCM a 5 ms las ganancias del ETSO producen chattering (torque conmutando entre ±τ_max). La versión sin LCM no lo tiene; adaptar el diseño al muestreo es el siguiente paso.
+
 Más detalles de la arquitectura de los tres procesos y los canales LCM en [Documentacion.pdf](Documentacion.pdf).
-
-

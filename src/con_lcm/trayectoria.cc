@@ -5,9 +5,8 @@
 /// este canal para mover el robot.
 ///
 /// Parametros facilmente ajustables:
-///   kFreqHz    - frecuencia de la oscilacion (Hz)
-///   kAmpRad    - amplitud en radianes para el joint 0
-///   kNumJoints - debe coincidir con el controlador (9)
+///   kFrecuenciaRefHz y kAmplitudRef en src/comun/referencia.h
+///   (las usa tambien el diseno ETSO del controlador)
 
 #include <cmath>
 #include <limits>
@@ -22,12 +21,12 @@
 #include "drake/systems/lcm/lcm_interface_system.h"
 #include "drake/systems/lcm/lcm_publisher_system.h"
 
+#include "referencia.h"
+
 namespace ipre2026 {
 namespace {
 
-const int kNumJoints = 9;
-const double kFreqHz = 0.1;   // periodo de 10 segundos
-const double kAmpRad = 0.4;   // amplitud de oscilacion del joint 0
+const int kNumJoints = kNumJointsTotal;  // 9
 
 // Genera el vector de estado deseado [q; dq] variando en el tiempo.
 // El joint 0 (rotacion de la base) oscila sinusoidalmente alrededor de
@@ -42,16 +41,12 @@ class SetpointSinusoidal : public drake::systems::LeafSystem<double> {
   void Calc(const drake::systems::Context<double>& ctx,
             drake::systems::BasicVector<double>* out) const {
     const double t = ctx.get_time();
-    const double w = 2 * std::numbers::pi * kFreqHz;
 
-    // Posicion home
-    Eigen::VectorXd q(kNumJoints), dq(kNumJoints);
-    q  << 0.0, -0.5, 0.0, -2.0, 0.0, 1.5, 0.0, 0.04, 0.04;
-    dq.setZero();
-
-    // Oscila el joint 0 alrededor del home
-    q[0]  += kAmpRad * std::sin(w * t);
-    dq[0]  = kAmpRad * w * std::cos(w * t);
+    // Referencia compartida con el experimento sin LCM (src/comun/referencia.h).
+    // q̈_d no se publica: el mensaje sigue siendo [q; dq] (2n).
+    const EstadoDeseado r = EvaluarReferencia(TipoReferencia::kSeno, t);
+    const Eigen::VectorXd& q = r.q;
+    const Eigen::VectorXd& dq = r.dq;
 
     for (int i = 0; i < kNumJoints; ++i) {
       out->SetAtIndex(i, q[i]);

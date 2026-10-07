@@ -1,5 +1,7 @@
 #include "planta_comun.h"
 
+#include "modelo_panda.h"
+
 #include <memory>
 #include <Eigen/Dense>
 
@@ -50,10 +52,8 @@ PlantaComun::PlantaComun() {
     plant_->RegisterVisualGeometry(plant_->world_body(), suelo, Box(5, 5, 0.02), "mesa_vis", drake::Vector4<double>(0.5, 0.5, 0.5, 1.0));
     plant_->RegisterCollisionGeometry(plant_->world_body(), suelo, Box(5, 5, 0.02), "mesa_col", CoulombFriction<double>(1.0, 1.0));
 
-    // modelo del brazo
-    auto panda_models = parser.AddModelsFromUrl("package://drake_models/franka_description/urdf/panda_arm_hand.urdf");
-    const auto& panda = panda_models[0];
-    plant_->WeldFrames(plant_->world_frame(), plant_->GetFrameByName("panda_link0", panda), RigidTransformd{});
+    // modelo del brazo, con friccion viscosa B en los joints (el URDF no la trae)
+    const auto panda = AgregarPanda(plant_, DampingPandaPorDefecto());
 
     // instancia de cubo
     auto instancia_cubo = plant_->AddModelInstance("cubo");
