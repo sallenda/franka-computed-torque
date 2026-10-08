@@ -8,6 +8,16 @@ cmake --build build -j4
 cmake --build build -j4
 
 
+// Experimento sin LCM (un solo proceso) //
+
+En vivo (Meshcat, parte en pausa: barra espaciadora para iniciar, R reinicia):
+./build/src/sin_lcm/experimento --modo=fl --offset=0.3 --visualizar
+
+Por lotes (guarda los primeros 10 s y termina):
+./build/src/sin_lcm/experimento --modo=fl --offset=0.3 --t_log=10
+python3 scripts/graficar.py resultados/fl
+
+
 // Variable de entorno (en cada terminal, si no esta en tu ~/.bashrc) //
 
 export DRAKE_RESOURCE_ROOT=$HOME/drake-install/share
@@ -16,15 +26,15 @@ export DRAKE_RESOURCE_ROOT=$HOME/drake-install/share
 // Correr en 3 terminales, en este orden //
 
 Terminal 1 - Simulacion (planta + Meshcat)
-./build/src/mi_sim_lcm
+./build/src/con_lcm/mi_sim_lcm
 // Abre la URL que imprime en el browser para ver el robot (http://localhost:7000) //
 
-Terminal 2 - Controlador (calcula torques via InverseDynamicsController)
-./build/src/mi_controlador
+Terminal 2 - Controlador (ETSO, modo FL por defecto)
+./build/src/con_lcm/mi_controlador
 // Mientras no corra mi_trayectoria, el robot se queda en la pose home //
 
 Terminal 3 - Trayectoria (publica el estado deseado por LCM)
-./build/src/mi_trayectoria
+./build/src/con_lcm/mi_trayectoria
 // El robot empieza a moverse al recibir los comandos de esta terminal //
 // Joint 0 oscila +-0.4 rad con periodo de 10 segundos //
-// Para ajustar: editar kFreqHz y kAmpRad en src/trayectoria.cc //
+// Para ajustar: editar kFrecuenciaRefHz y kAmplitudRef en src/comun/referencia.h //
