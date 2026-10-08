@@ -16,11 +16,12 @@ using drake::multibody::Parser;
 using drake::multibody::RevoluteJoint;
 
 ModelInstanceIndex AgregarPanda(MultibodyPlant<double>* plant,
-                                const Eigen::VectorXd& damping) {
+                                const Eigen::VectorXd& damping,
+                                const std::string& prefijo) {
     if (damping.size() != kNumJointsBrazo) {
         throw std::runtime_error("[AgregarPanda] damping debe tener tamano 7");
     }
-    Parser parser(plant);
+    Parser parser(plant, prefijo);
     const auto modelos = parser.AddModelsFromUrl(
         "package://drake_models/franka_description/urdf/panda_arm_hand.urdf");
     const ModelInstanceIndex panda = modelos.at(0);

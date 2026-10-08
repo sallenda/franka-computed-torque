@@ -154,19 +154,50 @@ export DRAKE_RESOURCE_ROOT=$HOME/drake-install/share
 
 ### Sin LCM (réplica del paper)
 
+**En vivo, para mirar el robot** (Meshcat):
+
+```bash
+./build/src/sin_lcm/experimento --modo=fl --offset=0.3 --visualizar
+```
+
+Abre la URL que imprime (http://localhost:7000). La simulación **parte en pausa**, para que el navegador alcance a cargar el robot antes de la fase de alcance, que dura menos de 1 s. Luego corre en tiempo real hasta que la detengas.
+
+- El robot blanco es la planta simulada; la **silueta azul translúcida es la referencia** q_d.
+- **Barra espaciadora**: iniciar / pausar. **R**: reiniciar en t = 0 (queda en pausa). Las teclas funcionan con el foco en la ventana de Meshcat.
+- En "Open Controls": los mismos botones, **Detener** (termina el programa) y el slider **Velocidad** (0.05–2× tiempo real; por ejemplo 0.1 para ver el alcance en cámara lenta).
+- Solo los primeros `--t_log` segundos (10 por defecto) se guardan en `log.csv`. Al llegar a ese tiempo se escribe el CSV y se imprime el resumen; la simulación sigue corriendo sin registrar, así que la memoria no crece.
+- En este modo el paso por defecto es `--dt=1e-3`, que corre ~3× más rápido que el tiempo real con resultados prácticamente iguales a 1e-4 para Δ = 1 %. Con `--dt=1e-4` la simulación va ~3× más lenta que el tiempo real y se ve en cámara lenta.
+- Si terminas con Ctrl+C antes de `--t_log`, no se escribe el CSV.
+
+**Por lotes, para obtener datos y figuras** (sin ventana; termina solo):
+
 ```bash
 # Modo FL, robot partiendo 0.3 rad desplazado de la referencia (fase de alcance)
-./build/src/sin_lcm/experimento --modo=fl --offset=0.3 --t_final=10 --salida=resultados/fl
-./build/src/sin_lcm/experimento --modo=vsc --offset=0.3 --t_final=10 --salida=resultados/vsc
-./build/src/sin_lcm/experimento --modo=ff --offset=0.3 --t_final=10 --salida=resultados/ff
+./build/src/sin_lcm/experimento --modo=fl --offset=0.3 --t_log=10 --salida=resultados/fl
+./build/src/sin_lcm/experimento --modo=vsc --offset=0.3 --t_log=10 --salida=resultados/vsc
+./build/src/sin_lcm/experimento --modo=ff --offset=0.3 --t_log=10 --salida=resultados/ff
 
 # Figuras comparando las tres estructuras (una por joint)
 python3 scripts/graficar.py resultados/vsc resultados/fl resultados/ff --salida figuras
 ```
 
-Opciones de `experimento`: `--modo=vsc|fl|ff`, `--referencia=seno|excitacion`, `--t_final`, `--dt` (paso de la planta, 1e-4 por defecto; 0 = continua), `--delta` (precisión Δ en % de A), `--offset` (desplazamiento inicial en rad), `--B_planta` (fricción de la planta, por defecto la misma que asume el controlador), `--dt_log`, `--salida`, `--visualizar` (Meshcat en tiempo real).
+Opciones de `experimento`:
 
-Al terminar imprime, por joint, el tiempo de alcance, el error máximo en la fase de seguimiento comparado con e_max = Δ·A y el porcentaje de tiempo con torque saturado.
+| Opción | Significado |
+|---|---|
+| `--modo=vsc\|fl\|ff` | estructura de control (por defecto `fl`) |
+| `--referencia=seno\|excitacion` | referencia (por defecto `seno`) |
+| `--t_log` | segundos iniciales que se guardan en el CSV (10) |
+| `--t_final` | duración total; por defecto = `t_log` por lotes, infinita con `--visualizar` |
+| `--dt` | paso de la planta: 1e-4 por lotes, 1e-3 con `--visualizar`; 0 = continua |
+| `--delta` | precisión Δ en % de A (1.0) |
+| `--offset` | desplazamiento inicial del robot respecto de la referencia, en rad (0) |
+| `--B_planta` | fricción de la planta; por defecto la misma que asume el controlador |
+| `--dt_log` | periodo de registro (1e-3) |
+| `--salida` | carpeta de resultados (`resultados/<modo>`) |
+| `--visualizar` | modo en vivo con Meshcat |
+
+Al llegar a `t_log` imprime, por joint, el tiempo de alcance, el error máximo en la fase de seguimiento comparado con e_max = Δ·A y el porcentaje de tiempo con torque saturado.
 
 **Estimación de la fricción viscosa B:**
 

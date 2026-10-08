@@ -10,7 +10,11 @@ cmake --build build -j4
 
 // Experimento sin LCM (un solo proceso) //
 
-./build/src/sin_lcm/experimento --modo=fl --offset=0.3 --t_final=10
+En vivo (Meshcat, parte en pausa: barra espaciadora para iniciar, R reinicia):
+./build/src/sin_lcm/experimento --modo=fl --offset=0.3 --visualizar
+
+Por lotes (guarda los primeros 10 s y termina):
+./build/src/sin_lcm/experimento --modo=fl --offset=0.3 --t_log=10
 python3 scripts/graficar.py resultados/fl
 
 

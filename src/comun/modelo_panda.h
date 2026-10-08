@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include <Eigen/Dense>
 
 #include "drake/multibody/plant/multibody_plant.h"
@@ -42,8 +44,13 @@ inline Eigen::VectorXd PoseHome() {
 //
 // Se usa tanto para la planta "real" como para la copia del controlador, asi
 // que para introducir incertidumbre basta con pasar un B distinto a cada una.
+//
+// `prefijo` (opcional) antepone un nombre al model instance (p.ej.
+// "referencia" -> "referencia::panda"); sirve para tener dos Panda en la misma
+// escena de Meshcat sin que choquen sus nombres.
 drake::multibody::ModelInstanceIndex AgregarPanda(
     drake::multibody::MultibodyPlant<double>* plant,
-    const Eigen::VectorXd& damping);
+    const Eigen::VectorXd& damping,
+    const std::string& prefijo = "");
 
 }  // namespace ipre2026
