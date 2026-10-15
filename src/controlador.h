@@ -85,7 +85,7 @@ private:
 // -----------------------------------------------------------------------------
 class ControladorPanda : public drake::systems::Diagram<double> {
 public:
-    explicit ControladorPanda(ModoControl modo = ModoControl::kVSC);
+    explicit ControladorPanda(ModoControl modo = ModoControl::kFL);
 
     const drake::systems::InputPort<double>& get_estimated_state_input_port() const {
         return this->get_input_port(estimated_state_input_port_index_);

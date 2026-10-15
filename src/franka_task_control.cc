@@ -97,7 +97,7 @@ int DoMain() {
         builder.AddSystem<DesiredStateFromLcm>(2 * kNumJoints, home);
     desired_receiver->set_name("desired_receiver");
 
-    // Controlador existente (InverseDynamicsController)
+    // Controlador ETSO
     auto controlador = builder.AddSystem<ControladorPanda>();
     controlador->set_name("controlador");
 
@@ -107,7 +107,7 @@ int DoMain() {
     command_sender->set_name("command_sender");
     auto command_pub = builder.AddSystem(
         drake::systems::lcm::LcmPublisherSystem::Make<drake::lcmt_panda_command>(
-            "PANDA_COMMAND", lcm, 0.005 /* periodo de publicacion */));
+            "PANDA_COMMAND", lcm, 0.001 /* periodo de publicacion */));
     command_pub->set_name("command_publisher");
 
     // Conexiones

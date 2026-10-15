@@ -28,9 +28,9 @@ using drake::systems::DiagramBuilder;
 
 namespace {
 
-// =============================================================================
-// PARAMETROS DE DISENO (decisiones tuyas, ver Tabla I del paper)
-// =============================================================================
+// ==============================================
+// PARAMETROS DE DISENO ETSO (Tabla I del paper)
+// ==============================================
 constexpr int kNumJointsBrazo = 7;
 
 // TODO: amplitud A_i de la referencia por joint. Debe coincidir con trayectoria.cc.
@@ -85,7 +85,7 @@ ControladorETSO::ControladorETSO(std::unique_ptr<MultibodyPlant<double>> plant,
 
 void ControladorETSO::CalcularParametrosETSO() {
     // --- PASO 0a: limite de torque tau_max,i (del URDF) ----------------------
-    // Asume que el orden de actuadores coincide con el de los joints (asi es en el Panda).
+    // Asume que el orden de actuadores coincide con el de los joints.
     tau_max_total_ = plant_->GetEffortUpperLimits();
     tau_max_ = tau_max_total_.head(n_etso_);
 
@@ -206,7 +206,7 @@ void ControladorETSO::CalcTorque(const Context<double>& context,
     const Eigen::VectorXd ddq_d = Eigen::VectorXd::Zero(n_);
 
     // -------------------------------------------------------------------------
-    // PASO 2: errores (seccion III)
+    // PASO 2: errores
     // -------------------------------------------------------------------------
     const Eigen::VectorXd e  = q_d - q;     // e_i  = q_di  - q_i
     const Eigen::VectorXd de = dq_d - dq;   // ė_i  = dq_di - dq_i
