@@ -13,15 +13,15 @@
 #include "drake/math/rigid_transform.h"
 #include "drake/multibody/parsing/parser.h"
 #include "drake/multibody/plant/multibody_plant.h"
-#include "drake/multibody/tree/revolute_joint.h"
 #include "drake/systems/framework/diagram_builder.h"
+
+#include "friccion_franka.h"
 
 namespace ipre2026 {
 
 using drake::math::RigidTransformd;
 using drake::multibody::MultibodyPlant;
 using drake::multibody::Parser;
-using drake::multibody::RevoluteJoint;
 using drake::systems::BasicVector;
 using drake::systems::Context;
 using drake::systems::DiagramBuilder;
@@ -41,9 +41,15 @@ constexpr double kAmplitudRad = 0.4;
 //       empezar, porque k crece como 1/Delta y con LCM a 5 ms un k grande chatterea.
 constexpr double kPrecisionPorc = 1.0;
 
-// TODO: friccion viscosa de respaldo si el URDF no trae damping [Nms].
-//       Si se usa, agrega el MISMO damping a la planta en franka_simulation.cc.
-constexpr double kBRespaldo = 10.0;
+// Friccion: la planta simulada usa el modelo sigmoidal de Gaz et al. (2019),
+// ver friccion_franka.h. El modelo del paper es lineal (J q̈ + B q̇), asi que:
+//   - B_i = friccion viscosa equivalente, ajustada por minimos cuadrados sobre
+//     las velocidades de la referencia, |q̇| <= kVelocidadAjusteB;
+//   - lo que el modelo lineal no explica, max |tau_f(q̇) - B q̇| hasta el limite
+//     de velocidad del joint (URDF), se suma a tau_Lmax (es carga no modelada).
+// TODO: debe coincidir con la velocidad maxima de trayectoria.cc
+//       (A * 2*pi*f = 0.4 * 2*pi*0.1 = 0.251 rad/s).
+constexpr double kVelocidadAjusteB = 0.4 * 2.0 * M_PI * 0.1;
 
 // Muestras para estimar J_ii,max
 constexpr int kMuestrasJmax = 5000;
@@ -89,17 +95,14 @@ void ControladorETSO::CalcularParametrosETSO() {
     tau_max_total_ = plant_->GetEffortUpperLimits();
     tau_max_ = tau_max_total_.head(n_etso_);
 
-    // --- PASO 0b: friccion viscosa B_i (damping del URDF) --------------------
+    // --- PASO 0b: friccion viscosa equivalente B_i (modelo de Gaz) ------------
+    // y la parte no lineal que sobra, que va a tau_Lmax en el PASO 0d.
+    const Eigen::VectorXd v_lim = plant_->GetVelocityUpperLimits().head(n_etso_);
     B_.resize(n_etso_);
+    tau_f_residuo_.resize(n_etso_);
     for (int i = 0; i < n_etso_; ++i) {
-        const std::string nombre = "panda_joint" + std::to_string(i + 1);
-        const auto& joint = plant_->GetJointByName<RevoluteJoint>(nombre);
-        B_[i] = joint.default_damping();
-        if (B_[i] <= 0.0) {
-            std::cerr << "[ETSO] " << nombre << " sin damping en el URDF; usando B = "
-                      << kBRespaldo << " Nms (TODO: revisar)" << std::endl;
-            B_[i] = kBRespaldo;
-        }
+        B_[i] = BEquivalente(i, kVelocidadAjusteB);
+        tau_f_residuo_[i] = ResiduoFriccionMax(i, B_[i], v_lim[i]);
     }
 
     // --- PASO 0c: inercia diagonal maxima j_ii,max -----------------------------
@@ -110,7 +113,8 @@ void ControladorETSO::CalcularParametrosETSO() {
     // TODO: calcular evaluando c + g + sum_{j!=i} J_ij * q̈_j a lo largo de la
     //       trayectoria (con el modelo peor caso) y agregar margen.
     //       Placeholder: misma proporcion que el paper (tau_Lmax = tau_max / 2).
-    tau_L_max_ = 0.5 * tau_max_;
+    // + la parte de la friccion que el modelo lineal B q̇ no explica (PASO 0b).
+    tau_L_max_ = 0.5 * tau_max_ + tau_f_residuo_;
 
     // --- PASO 0e: referencia y precision (decisiones de diseno) ---------------
     A_     = Eigen::VectorXd::Constant(n_etso_, kAmplitudRad);

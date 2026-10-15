@@ -66,7 +66,8 @@ private:
     // Parametros por articulacion del brazo (tamano n_etso_), nombres como en Tabla I
     Eigen::VectorXd tau_max_;     // tau_max,i   limite de torque
     Eigen::VectorXd tau_L_max_;   // tau_Lmax,i  cota del torque de carga (4)
-    Eigen::VectorXd B_;           // B_i         friccion viscosa
+    Eigen::VectorXd B_;           // B_i         friccion viscosa equivalente (Gaz)
+    Eigen::VectorXd tau_f_residuo_;  // max |tau_f - B q̇|, sumado a tau_Lmax
     Eigen::VectorXd J_max_;       // j_ii,max    inercia diagonal maxima
     Eigen::VectorXd A_;           // A_i         amplitud de referencia
     Eigen::VectorXd Delta_;       // Delta_i     precision deseada [% de A_i]
