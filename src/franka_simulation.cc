@@ -1,5 +1,7 @@
 #include "planta_comun.h"
 
+#include "friccion_franka.h"
+
 #include <memory>
 #include <Eigen/Dense>
 
@@ -68,6 +70,14 @@ PlantaComun::PlantaComun() {
 
 
     plant_->Finalize();
+
+    // Friccion articular realista del Panda (Gaz et al. 2019, ver friccion_franka.h).
+    // El URDF no trae friccion; sin esto el robot simulado no tendria ninguna.
+    auto friccion = builder.AddSystem<FriccionFranka>(*plant_, panda);
+    friccion->set_name("friccion_franka");
+    builder.Connect(plant_->get_state_output_port(), friccion->get_input_port());
+    builder.Connect(friccion->get_output_port(),
+                    plant_->get_applied_generalized_force_input_port());
 
     // Numero de joints controlados por LCM (7 del brazo + 2 de los dedos)
     const int num_joints = plant_->num_actuated_dofs(panda);

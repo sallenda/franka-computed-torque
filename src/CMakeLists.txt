@@ -2,6 +2,8 @@
 add_library(ipre2026_lcm
     franka_simulation.cc
     planta_comun.h
+    friccion_franka.cc
+    friccion_franka.h
     controlador.cc
     controlador.h
 )
