@@ -153,4 +153,20 @@ Correr en 3 terminales, en este orden:
 
 Más detalles de la arquitectura de los tres procesos y los canales LCM en [Documentacion.pdf](Documentacion.pdf).
 
+## Fricción articular
+
+El URDF del Panda no trae fricción, así que la planta simulada (`franka_simulation.cc`) usa el modelo identificado por Gaz et al. (2019) en un Panda real (`src/friccion_franka.*`). Es una sigmoide por joint, una especie de Coulomb suave que se satura en ±0.1–0.7 Nm según el joint:
+
+τ_f(q̇) = φ₁ / (1 + e^(−φ₂(q̇+φ₃))) − φ₁ / (1 + e^(−φ₂φ₃))
+
+El controlador ETSO usa el modelo lineal del paper (J q̈ + B q̇), por eso:
+
+- **B** de cada joint es la fricción viscosa equivalente: el ajuste por mínimos cuadrados de τ_f ≈ B·q̇ en el rango de velocidades de la referencia (|q̇| ≤ 0.25 rad/s). Resulta entre 0.6 y 1.6 Nms/rad.
+- Lo que el modelo lineal no explica, max |τ_f − B·q̇| hasta el límite de velocidad del joint, se suma a **τ_Lmax**, como carga no modelada de la ec. (4).
+
+Los φ son los del robot de Gaz et al.; un Franka específico puede tener otros valores.
+
+> C. Gaz, M. Cognetti, A. Oliva, P. Robuffo Giordano, A. De Luca, "Dynamic Identification of the Franka Emika Panda Robot With Retrieval of Feasible Parameters Using Penalty-Based Optimization", IEEE Robotics and Automation Letters, 2019.
+
+
 
