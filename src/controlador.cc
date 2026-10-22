@@ -4,6 +4,8 @@
 #include <cmath>
 #include <iomanip>
 #include <iostream>
+#include <limits>
+#include <random>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -16,6 +18,7 @@
 #include "drake/systems/framework/diagram_builder.h"
 
 #include "friccion_franka.h"
+#include "protocolo_lcm.h"
 
 namespace ipre2026 {
 
@@ -37,9 +40,25 @@ constexpr int kNumJointsBrazo = 7;
 //       Ojo: la ETSO necesita A_i > 0 en todos los joints (define e_max y omega_max).
 constexpr double kAmplitudRad = 0.4;
 
-// TODO: precision deseada Delta_i [% de A_i]. El paper usa 0.1; aqui 1.0 para
-//       empezar, porque k crece como 1/Delta y con LCM a 5 ms un k grande chatterea.
+// Precision DESEADA Delta_i [% de A_i] (e_max = Delta/100 * A). El paper usa 0.1.
+// k crece como 1/Delta: si con este Delta un joint no es estable muestreado a
+// 1 kHz (ver kKappaMax), el diseno lo sube SOLO en ese joint y lo avisa.
 constexpr double kPrecisionPorc = 1.0;
+
+// Limite de estabilidad del lazo muestreado (PASO 0g). En la zona lineal de la
+// ETSO, la velocidad de cada joint converge a la linea de conmutacion con tasa
+// ~ (alpha + k) * J_max / j  (j = inercia real <= J_max). Con el controlador
+// muestreado cada h, si  kappa = h (alpha + k) J_max / j_min  es muy grande el
+// torque oscila a la frecuencia de Nyquist (+tau_max, -tau_max, ...): chattering.
+// Medido en la simulacion sincrona a 1 kHz: chattering con kappa >= ~1.25,
+// sin chattering con kappa <= ~1.15. Se usa 1.0 como margen.
+constexpr double kKappaMax = 1.0;
+
+// Region de trabajo para j_ii,max y j_ii,min: home +- (A + margen) en cada joint.
+// La garantia del diseno vale mientras el robot este dentro de esta region
+// (por eso la planta parte en home). Rango completo del URDF: J_max/j_min llega
+// a ~6 en el joint 1 y obliga a un Delta ~2 veces mayor.
+constexpr double kMargenRegion = 0.1;  // [rad]
 
 // Friccion: la planta simulada usa el modelo sigmoidal de Gaz et al. (2019),
 // ver friccion_franka.h. El modelo del paper es lineal (J q̈ + B q̇), asi que:
@@ -51,8 +70,8 @@ constexpr double kPrecisionPorc = 1.0;
 //       (A * 2*pi*f = 0.4 * 2*pi*0.1 = 0.251 rad/s).
 constexpr double kVelocidadAjusteB = 0.4 * 2.0 * M_PI * 0.1;
 
-// Muestras para estimar J_ii,max
-constexpr int kMuestrasJmax = 5000;
+// Muestras para estimar J_ii,max y J_ii,min
+constexpr int kMuestrasJmax = 20000;
 
 // PD simple para los dedos (joints 8 y 9)
 constexpr double kKpDedos = 50.0;
@@ -105,9 +124,12 @@ void ControladorETSO::CalcularParametrosETSO() {
         tau_f_residuo_[i] = ResiduoFriccionMax(i, B_[i], v_lim[i]);
     }
 
-    // --- PASO 0c: inercia diagonal maxima j_ii,max -----------------------------
-    // TODO: idealmente muestrear solo el rango que recorre TU trayectoria.
-    J_max_ = CalcularJmax(kMuestrasJmax).head(n_etso_);
+    // --- PASO 0c: inercia diagonal maxima j_ii,max (y minima) -----------------
+    // En la region de trabajo, no en todo el rango articular (ver kMargenRegion).
+    Eigen::VectorXd j_max, j_min;
+    CalcularInercias(kMuestrasJmax, &j_max, &j_min);
+    J_max_ = j_max.head(n_etso_);
+    j_min_ = j_min.head(n_etso_);
 
     // --- PASO 0d: cota del torque de carga tau_Lmax,i, ec. (4) ------------------
     // TODO: calcular evaluando c + g + sum_{j!=i} J_ij * q̈_j a lo largo de la
@@ -150,30 +172,66 @@ void ControladorETSO::CalcularParametrosETSO() {
         k_[i] = 100.0 * tau_max_[i] * w_max_[i] / (Delta_[i] * dtau)
                 * std::sqrt((w2 + invT2) / (w2 + a2));
     }
+
+    // --- PASO 0g: precision alcanzable con control muestreado a 1 kHz ---------
+    // kappa = h (alpha + k) J_max / j_min <= kKappaMax. Como k = k(1%) / Delta,
+    // el menor Delta que lo cumple es
+    //   Delta_min = h k(1%) r / (kKappaMax - h alpha r),   r = J_max / j_min.
+    const double h = kPeriodoControl;
+    kappa_.resize(n_etso_);
+    for (int i = 0; i < n_etso_; ++i) {
+        const double r = J_max_[i] / j_min_[i];
+        const double margen = kKappaMax - h * alpha_[i] * r;
+        if (margen <= 0.0) {
+            throw std::runtime_error("[ETSO] joint " + std::to_string(i + 1) +
+                ": alpha demasiado grande para muestrear a 1 kHz");
+        }
+        const double k_1porc = k_[i] * Delta_[i];  // k con Delta = 1 %
+        const double delta_min = h * k_1porc * r / margen;
+        if (Delta_[i] < delta_min) {
+            std::cout << "[ETSO] joint " << i + 1 << ": Delta " << Delta_[i]
+                      << " % es inestable muestreado a " << 1.0 / h << " Hz; se usa "
+                      << delta_min << " %" << std::endl;
+            Delta_[i] = delta_min;
+            k_[i] = k_1porc / delta_min;
+        }
+        kappa_[i] = h * (alpha_[i] + k_[i]) * r;
+    }
 }
 
-Eigen::VectorXd ControladorETSO::CalcularJmax(int num_muestras) const {
-    // Muestreo aleatorio uniforme dentro de los limites articulares del URDF.
-    const Eigen::VectorXd lo = plant_->GetPositionLowerLimits();
-    const Eigen::VectorXd hi = plant_->GetPositionUpperLimits();
-    Eigen::VectorXd j_max = Eigen::VectorXd::Zero(n_);
-    Eigen::MatrixXd M(n_, n_);
+void ControladorETSO::CalcularInercias(int num_muestras, Eigen::VectorXd* j_max,
+                                       Eigen::VectorXd* j_min) const {
+    // Muestreo uniforme en la region de trabajo: home +- (A + margen), recortada
+    // a los limites del URDF. Los dedos quedan fijos en home.
+    const Eigen::VectorXd lim_lo = plant_->GetPositionLowerLimits();
+    const Eigen::VectorXd lim_hi = plant_->GetPositionUpperLimits();
+    const Eigen::VectorXd home = PoseHome();
+    Eigen::VectorXd lo = home, hi = home;
+    for (int i = 0; i < n_etso_; ++i) {
+        lo[i] = std::max(lim_lo[i], home[i] - kAmplitudRad - kMargenRegion);
+        hi[i] = std::min(lim_hi[i], home[i] + kAmplitudRad + kMargenRegion);
+    }
+    std::mt19937 rng(0);  // semilla fija: diseno reproducible
+    std::uniform_real_distribution<double> U(0.0, 1.0);
 
+    *j_max = Eigen::VectorXd::Zero(n_);
+    *j_min = Eigen::VectorXd::Constant(n_, std::numeric_limits<double>::infinity());
+    Eigen::MatrixXd M(n_, n_);
+    Eigen::VectorXd q(n_);
     plant_->SetVelocities(plant_context_.get(), Eigen::VectorXd::Zero(n_));
     for (int s = 0; s < num_muestras; ++s) {
-        const Eigen::VectorXd r = 0.5 * (Eigen::VectorXd::Random(n_).array() + 1.0);
-        const Eigen::VectorXd q = lo + r.cwiseProduct(hi - lo);
+        for (int i = 0; i < n_; ++i) q[i] = lo[i] + U(rng) * (hi[i] - lo[i]);
         plant_->SetPositions(plant_context_.get(), q);
         plant_->CalcMassMatrix(*plant_context_, &M);
-        j_max = j_max.cwiseMax(M.diagonal());
+        *j_max = j_max->cwiseMax(M.diagonal());
+        *j_min = j_min->cwiseMin(M.diagonal());
     }
-    return j_max;
 }
 
 void ControladorETSO::ImprimirParametros() const {
     std::cout << "\n[ETSO] Parametros de diseno (formato Tabla I)\n"
               << " joint   tau_max  tau_Lmax        B    J_max    T_max"
-              << "    w_max    alpha          k    e_max\n";
+              << "    w_max    alpha          k  Delta[%]    e_max   kappa\n";
     std::cout << std::fixed;
     for (int i = 0; i < n_etso_; ++i) {
         std::cout << std::setw(6) << i + 1
@@ -188,8 +246,12 @@ void ControladorETSO::ImprimirParametros() const {
                   << std::setw(9)  << alpha_[i]
                   << std::setprecision(1)
                   << std::setw(11) << k_[i]
+                  << std::setprecision(2)
+                  << std::setw(10) << Delta_[i]
                   << std::setprecision(5)
-                  << std::setw(9)  << Delta_[i] / 100.0 * A_[i] << "\n";
+                  << std::setw(9)  << Delta_[i] / 100.0 * A_[i]
+                  << std::setprecision(2)
+                  << std::setw(8)  << kappa_[i] << "\n";
     }
     std::cout << std::endl;
 }

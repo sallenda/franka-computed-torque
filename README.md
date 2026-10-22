@@ -130,17 +130,19 @@ print("pydrake OK")
 Compilar el proyecto:
 
 ```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j4
 ```
 
-Correr en 3 terminales, en este orden:
+Correr en 3 terminales, en cualquier orden (lo usual es este):
 
 ```bash
 # Terminal 1 - Simulación (planta + Meshcat)
 ./build/src/mi_sim_lcm
-# Abre la URL que imprime en el navegador para ver el robot
+# Abre la URL que imprime en el navegador para ver el robot.
+# El robot parte en home y la simulación queda en pausa hasta que responda el controlador.
 
-# Terminal 2 - Controlador (dinámica inversa)
+# Terminal 2 - Controlador (ETSO, modo FL)
 ./build/src/mi_controlador
 # Mientras no corra mi_trayectoria, el robot se queda en la pose home
 
@@ -150,6 +152,31 @@ Correr en 3 terminales, en este orden:
 # Joint 0 oscila +-0.4 rad con periodo de 10 segundos
 # Para ajustar: editar kFreqHz y kAmpRad en src/trayectoria.cc
 ```
+
+Si el controlador se cae, la simulación se pausa (el robot no se cae) y se reanuda sola al relanzarlo.
+
+### Lazo síncrono a 1 kHz (`src/protocolo_lcm.h`)
+
+Los tres procesos siguen comunicándose solo por LCM, pero en un ciclo síncrono, igual que libfranka con el Franka real: el robot entrega el estado en t y el controlador devuelve el torque de ese mismo instante. Un ciclo, cada 1 ms:
+
+1. `mi_sim_lcm` publica `PANDA_STATUS` con `utime = t`.
+2. `mi_trayectoria` responde `DESIRED_STATE` con `timestamp = t`.
+3. `mi_controlador`, con estado(t) y referencia(t), publica `PANDA_COMMAND` con `utime = t`.
+4. `mi_sim_lcm` aplica ese torque y avanza 1 ms.
+
+Antes cada proceso publicaba con su propio reloj, y entre el estado medido y el torque aplicado se acumulaban de 1 a 6 ms de retardo variable. Ahora el lazo LCM da exactamente lo mismo que una simulación de un solo proceso con el controlador muestreado a 1 ms. Si se pierde un paquete, la planta reenvía el estado a los 50 ms y el controlador reenvía el comando.
+
+### Precisión alcanzable a 1 kHz (Δ por joint)
+
+Con el controlador muestreado cada h = 1 ms, la ganancia del lazo por periodo de cada joint es
+
+κ = h · (α + k) · J_max / j_min
+
+Si κ es muy grande, el torque oscila a la frecuencia de Nyquist (+τ_max, −τ_max, …): eso es el chattering. En la simulación síncrona aparece con κ ≥ ~1.25 y no aparece con κ ≤ ~1.15.
+
+Como k es inversamente proporcional a Δ, el controlador (`src/controlador.cc`, PASO 0g) calcula para cada joint el menor Δ que deja κ ≤ `kKappaMax` = 1.0. Usa ese Δ solo si es mayor que la precisión deseada `kPrecisionPorc`, y lo avisa al partir. La tabla de parámetros muestra Δ, e_max y κ de cada joint. Hoy resulta Δ ≈ [3.5, 2.3, 2.4, 1.9, 1.2, 1.3, 1.2] %.
+
+J_max y j_min se calculan en la región de trabajo (home ± (A + 0.1 rad)), no en todo el rango del URDF. En el rango completo, J_max/j_min llega a ~6 en el joint 1 y obligaría a un Δ cerca de 2 veces mayor. Por eso la planta parte en home: la garantía del diseño vale mientras el robot esté en esa región.
 
 Más detalles de la arquitectura de los tres procesos y los canales LCM en [Documentacion.pdf](Documentacion.pdf).
 
