@@ -13,6 +13,11 @@ public:
     const drake::multibody::MultibodyPlant<double>& get_plant() const { return *plant_; }
     const drake::geometry::SceneGraph<double>& get_scene_graph() const { return *scene_graph_; }
 
+    // Torque aplicado a los 9 actuadores del Panda (7 brazo + 2 dedos)
+    const drake::systems::InputPort<double>& get_torque_input_port() const {
+        return this->get_input_port(torque_input_port_index_);
+    }
+
     const drake::systems::OutputPort<double>& get_state_output_port() const {
         return this->get_output_port(state_output_port_index_);
     }
@@ -25,6 +30,7 @@ private:
     drake::multibody::MultibodyPlant<double>* plant_{nullptr};
     drake::geometry::SceneGraph<double>* scene_graph_{nullptr};
 
+    drake::systems::InputPortIndex torque_input_port_index_;
     drake::systems::OutputPortIndex state_output_port_index_;
     drake::systems::OutputPortIndex query_output_port_index_;
 };

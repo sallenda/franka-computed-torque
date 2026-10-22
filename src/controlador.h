@@ -42,7 +42,9 @@ public:
 private:
     // PASO 0: diseno de parametros ETSO (se ejecuta una vez, en el constructor)
     void CalcularParametrosETSO();
-    Eigen::VectorXd CalcularJmax(int num_muestras) const;
+    // j_ii,max y j_ii,min en la region de trabajo (home +- (A + margen)).
+    void CalcularInercias(int num_muestras, Eigen::VectorXd* j_max,
+                          Eigen::VectorXd* j_min) const;
     void ImprimirParametros() const;
 
     // PASOS 1-7: ley de control (se ejecuta en cada paso)
@@ -68,7 +70,9 @@ private:
     Eigen::VectorXd tau_L_max_;   // tau_Lmax,i  cota del torque de carga (4)
     Eigen::VectorXd B_;           // B_i         friccion viscosa equivalente (Gaz)
     Eigen::VectorXd tau_f_residuo_;  // max |tau_f - B q̇|, sumado a tau_Lmax
-    Eigen::VectorXd J_max_;       // j_ii,max    inercia diagonal maxima
+    Eigen::VectorXd J_max_;       // j_ii,max    inercia diagonal maxima (region de trabajo)
+    Eigen::VectorXd j_min_;       // j_ii,min    inercia diagonal minima (region de trabajo)
+    Eigen::VectorXd kappa_;       // ganancia del lazo por periodo, h (alpha + k) J_max / j_min
     Eigen::VectorXd A_;           // A_i         amplitud de referencia
     Eigen::VectorXd Delta_;       // Delta_i     precision deseada [% de A_i]
     Eigen::VectorXd T_;           // T_max,i = J_max / B
